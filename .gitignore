@@ -1,0 +1,50 @@
+# Visual Studio
+.vs/
+.vscode/
+.idea/
+
+# Java / Maven
+target/
+
+# .NET
+bin/
+obj/
+
+# Node
+node_modules/
+dist/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Eclipse
+.metadata/
+.classpath
+.project
+.settings/
+
+# Visual Studio
+.vs/
+
+# Build output
+target/
+bin/
+obj/
+
+# Node
+node_modules/
+dist/
+
+# Environment
+.env
+.env.*
+!.env.example
