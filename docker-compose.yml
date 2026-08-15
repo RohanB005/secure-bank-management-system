@@ -1,0 +1,159 @@
+services:
+
+  mysql:
+    image: mysql:8.4
+    container_name: secure-bank-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - bank-network
+
+  auth-service:
+    build:
+      context: ./backend/bank-auth-service
+    container_name: bank-auth-service
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "9090:9090"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - bank-network
+
+  account-service:
+    build:
+      context: ./backend/bank-account-service
+    container_name: bank-account-service
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      AUTH_SERVICE_URL: http://auth-service:9090
+    ports:
+      - "8082:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - bank-network
+
+  transaction-service:
+    build:
+      context: ./backend/bank-transaction-service
+    container_name: bank-transaction-service
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      ACCOUNT_SERVICE_URL: http://account-service:8082
+    ports:
+      - "8085:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      account-service:
+        condition: service_started
+    networks:
+      - bank-network
+
+  transfer-flow:
+    build:
+      context: ./backend/TransferFlow
+    container_name: bank-transfer-flow
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      ACCOUNT_SERVICE_URL: http://account-service:8082
+    ports:
+      - "8083:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      account-service:
+        condition: service_started
+    networks:
+      - bank-network
+
+  ivr-service:
+    build:
+      context: ./backend/bank-ivr-service
+    container_name: bank-ivr-service
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      ACCOUNT_SERVICE_URL: http://account-service:8082
+    ports:
+      - "8084:8084"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      account-service:
+        condition: service_started
+    networks:
+      - bank-network
+
+  fraud-service:
+    build:
+      context: ./backend/fraud-detection-service
+    container_name: bank-fraud-service
+    restart: unless-stopped
+    environment:
+      Gemini__ApiKey: ${GEMINI_API_KEY}
+      Gemini__Model: ${GEMINI_MODEL}
+    ports:
+      - "8081:8080"
+    networks:
+      - bank-network
+
+  frontend:
+    build:
+      context: ./frontend/bank-management-frontend
+    container_name: bank-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - auth-service
+      - account-service
+      - transaction-service
+    networks:
+      - bank-network
+
+volumes:
+  mysql_data:
+
+networks:
+  bank-network:
+    driver: bridge
